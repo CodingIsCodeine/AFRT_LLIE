@@ -1,0 +1,40 @@
+# AFRT Configuration File
+# Edit these parameters to customize training and inference
+
+# Model Architecture Parameters
+model:
+  dim: 64                    # Base feature dimension (32/64/128, higher = better quality but slower)
+  num_blocks: 6             # Number of transformer blocks (4-8 recommended)
+
+# Training Parameters
+training:
+  batch_size: 4             # Reduce to 2 or 1 if GPU runs out of memory
+  epochs: 100               # Total training epochs
+  lr: 0.001                 # Learning rate (0.0001 for fine-tuning)
+  save_freq: 10             # Save checkpoint every N epochs
+  
+  # Dataset paths
+  dataset_path: 'data/lol'  # Path to LOL dataset
+  
+  # Output paths
+  checkpoint_dir: 'checkpoints'
+  
+  # Device configuration
+  device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU (much slower)
+  num_workers: 4            # DataLoader workers (reduce if CPU limited)
+
+# Inference Parameters
+inference:
+  model_path: 'checkpoints/best_model.pth'  # Path to trained model
+  device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU
+  output_dir: 'outputs'     # Where to save enhanced images
+
+# Loss Weights (advanced, modify carefully)
+loss_weights:
+  l1: 1.0                   # L1 reconstruction loss
+  perceptual: 0.1           # Perceptual (VGG) loss
+  ssim: 0.5                 # SSIM loss
+  freq_low: 0.3             # Low-frequency consistency
+  freq_high: 0.3            # High-frequency consistency
+  tv: 0.01                  # Total variation (smoothness)
+  color: 0.1                # Color consistency
