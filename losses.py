@@ -28,7 +28,7 @@ class PerceptualLoss(nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()
         # Load pretrained VGG19 with batch normalization
-        vgg = models.vgg19_bn(pretrained=True)
+        vgg = models.vgg19_bn(weights=models.VGG19_Weights.IMAGENET1K_V1)
         
         # Extract features up to relu4_2 (good balance of high/low level features)
         # VGG19_bn layers: conv-bn-relu blocks

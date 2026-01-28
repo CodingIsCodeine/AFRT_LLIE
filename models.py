@@ -116,10 +116,10 @@ class IlluminationEstimator(nn.Module):
         self.bottleneck = ConvBlock(dim * 4, dim * 4)
         
         # Decoder pathway (upsampling with skip connections)
-        self.dec3 = ConvBlock(dim * 8, dim * 2)  # dim*4 from bottleneck + dim*4 from skip
+        self.dec3 = ConvBlock(dim * 6, dim * 2)  # dim*4 from bottleneck + dim*4 from skip
         self.up3 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         
-        self.dec2 = ConvBlock(dim * 4, dim)  # dim*2 from dec3 + dim*2 from skip
+        self.dec2 = ConvBlock(dim * 3, dim)  # ← FIXED: dim*2 from dec3 + dim from skip = dim*3
         self.up2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         
         self.dec1 = ConvBlock(dim * 2, dim)  # dim from dec2 + dim from skip
@@ -158,7 +158,7 @@ class IlluminationEstimator(nn.Module):
         d3 = self.dec3(d3)  # [B, dim*2, H/2, W/2]
         
         d2 = self.up2(d3)  # [B, dim*2, H, W]
-        d2 = torch.cat([d2, e1], dim=1)  # [B, dim*3, H, W] - FIXED: was dim*4
+        d2 = torch.cat([d2, e1], dim=1)  # [B, dim*3, H, W] ← This is 192 channels with dim=64
         d2 = self.dec2(d2)  # [B, dim, H, W]
         
         d1 = self.dec1(torch.cat([d2, e1], dim=1))  # [B, dim, H, W]
@@ -565,30 +565,60 @@ class AFRT(nn.Module):
 
 
 # Test function to verify model architecture
+# if __name__ == "__main__":
+#     print("Testing AFRT Model Architecture...")
+    
+#     # Create model
+#     model = AFRT(dim=64, num_blocks=6)
+    
+#     # Count parameters
+#     total_params = sum(p.numel() for p in model.parameters())
+#     print(f"Total parameters: {total_params:,}")
+    
+#     # Test 1: Small resolution for architecture verification
+#     print("\n[Test 1] Architecture test with 64x64 input...")
+#     test_input_small = torch.randn(2, 3, 64, 64)
+#     with torch.no_grad():
+#         output_small, illum_small = model(test_input_small)
+#     print(f"  ✓ Small input passed: {test_input_small.shape} -> {output_small.shape}")
+    
+#     # Test 2: Full resolution with batch=1
+#     print("\n[Test 2] Full resolution test with 256x256 input...")
+#     test_input_full = torch.randn(1, 3, 256, 256)  # Batch size = 1
+#     with torch.no_grad():
+#         output_full, illum_full = model(test_input_full)
+#     print(f"  ✓ Full input passed: {test_input_full.shape} -> {output_full.shape}")
+    
+#     # Verify output range
+#     print(f"\nOutput range: [{output_full.min().item():.4f}, {output_full.max().item():.4f}]")
+#     print(f"Illumination range: [{illum_full.min().item():.4f}, {illum_full.max().item():.4f}]")
+    
+#     print("\n✓ Model architecture test passed!")
+
 if __name__ == "__main__":
     print("Testing AFRT Model Architecture...")
     
-    # Create model
-    model = AFRT(dim=64, num_blocks=6)
+    # Use CPU for testing
+    device = torch.device('cpu')
+    print(f"Using device: {device}")
+    
+    # Create small model for CPU testing
+    model = AFRT(dim=32, num_blocks=2).to(device)  # Smaller for CPU
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Total parameters: {total_params:,}")
     
-    # Test forward pass
-    batch_size = 2
-    height, width = 256, 256
-    test_input = torch.randn(batch_size, 3, height, width)
-    
-    print(f"\nInput shape: {test_input.shape}")
+    # Test with small resolution (CPU can't handle large attention)
+    print("\nTesting with 64x64 input (CPU compatible)...")
+    test_input = torch.randn(1, 3, 64, 64).to(device)  # Batch=1, 64x64
     
     with torch.no_grad():
         output, illum_map = model(test_input)
     
+    print(f"Input shape: {test_input.shape}")
     print(f"Output shape: {output.shape}")
-    print(f"Illumination map shape: {illum_map.shape}")
-    
-    # Verify output range
+    print(f"Illumination shape: {illum_map.shape}")
     print(f"\nOutput range: [{output.min().item():.4f}, {output.max().item():.4f}]")
     print(f"Illumination range: [{illum_map.min().item():.4f}, {illum_map.max().item():.4f}]")
     

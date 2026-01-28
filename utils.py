@@ -203,7 +203,9 @@ def save_image(tensor, save_path):
     """
     try:
         # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_dir = os.path.dirname(save_path)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
         
         # Handle batch dimension
         if tensor.dim() == 4:
