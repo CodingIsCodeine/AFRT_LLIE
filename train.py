@@ -256,7 +256,7 @@ def main():
         mode='max',
         factor=0.5,
         patience=10,
-        verbose=True
+        # verbose=True
     )
     
     # Load datasets
@@ -265,7 +265,7 @@ def main():
         train_loader, test_loader = get_dataloaders(
             dataset_path=config['training']['dataset_path'],
             batch_size=config['training']['batch_size'],
-            image_size=256,
+            image_size=config['training'].get('image_size', 256),
             num_workers=config['training']['num_workers']
         )
     except Exception as e:

@@ -84,7 +84,8 @@ class LowLightDataset(Dataset):
         
         # Load images
         low_path = os.path.join(self.low_dir, img_name)
-        high_path = os.path.join(self.high_dir, img_name)
+        high_name = img_name.replace('low', 'high', 1)
+        high_path = os.path.join(self.high_dir, high_name)
         
         try:
             # Read with OpenCV (BGR format)
@@ -174,7 +175,7 @@ def get_dataloaders(dataset_path, batch_size=4, image_size=256, num_workers=4):
             batch_size=1,  # Use batch size 1 for testing
             shuffle=False,
             num_workers=num_workers,
-            pin_memory=True
+            pin_memory=torch.cuda.is_available()
         )
         
         print(f"\nDataloaders created:")
