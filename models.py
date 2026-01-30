@@ -595,23 +595,53 @@ class AFRT(nn.Module):
     
 #     print("\n✓ Model architecture test passed!")
 
+# if __name__ == "__main__":
+#     print("Testing AFRT Model Architecture...")
+    
+#     # Use CPU for testing
+#     device = torch.device('cpu')
+#     print(f"Using device: {device}")
+    
+#     # Create small model for CPU testing
+#     model = AFRT(dim=32, num_blocks=2).to(device)  # Smaller for CPU
+    
+#     # Count parameters
+#     total_params = sum(p.numel() for p in model.parameters())
+#     print(f"Total parameters: {total_params:,}")
+    
+#     # Test with small resolution (CPU can't handle large attention)
+#     print("\nTesting with 64x64 input (CPU compatible)...")
+#     test_input = torch.randn(1, 3, 64, 64).to(device)  # Batch=1, 64x64
+    
+#     with torch.no_grad():
+#         output, illum_map = model(test_input)
+    
+#     print(f"Input shape: {test_input.shape}")
+#     print(f"Output shape: {output.shape}")
+#     print(f"Illumination shape: {illum_map.shape}")
+#     print(f"\nOutput range: [{output.min().item():.4f}, {output.max().item():.4f}]")
+#     print(f"Illumination range: [{illum_map.min().item():.4f}, {illum_map.max().item():.4f}]")
+    
+#     print("\n✓ Model architecture test passed!")
+
+
 if __name__ == "__main__":
     print("Testing AFRT Model Architecture...")
     
-    # Use CPU for testing
-    device = torch.device('cpu')
+    # Use GPU if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Create small model for CPU testing
-    model = AFRT(dim=32, num_blocks=2).to(device)  # Smaller for CPU
+    # Create model
+    model = AFRT(dim=64, num_blocks=6).to(device)
     
     # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Total parameters: {total_params:,}")
     
-    # Test with small resolution (CPU can't handle large attention)
-    print("\nTesting with 64x64 input (CPU compatible)...")
-    test_input = torch.randn(1, 3, 64, 64).to(device)  # Batch=1, 64x64
+    # Test with full resolution
+    print("\nTesting with 256x256 input...")
+    test_input = torch.randn(1, 3, 256, 256).to(device)  # Batch=1 for testing
     
     with torch.no_grad():
         output, illum_map = model(test_input)
@@ -621,5 +651,8 @@ if __name__ == "__main__":
     print(f"Illumination shape: {illum_map.shape}")
     print(f"\nOutput range: [{output.min().item():.4f}, {output.max().item():.4f}]")
     print(f"Illumination range: [{illum_map.min().item():.4f}, {illum_map.max().item():.4f}]")
+    
+    if device.type == 'cuda':
+        print(f"\nGPU Memory used: {torch.cuda.max_memory_allocated() / 1e9:.2f} GB")
     
     print("\n✓ Model architecture test passed!")

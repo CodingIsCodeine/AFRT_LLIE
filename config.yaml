@@ -3,21 +3,21 @@
 
 # Model Architecture Parameters
 model:
-  # dim: 64                    # Base feature dimension (32/64/128, higher = better quality but slower)
-  dim: 32                    # Base feature dimension (32/64/128, higher = better quality but slower)
-  # num_blocks: 6             # Number of transformer blocks (4-8 recommended)
-  num_blocks: 2             # Number of transformer blocks (4-8 recommended)
+  dim: 64                    # Base feature dimension (32/64/128, higher = better quality but slower)
+  # dim: 32                    # Base feature dimension (32/64/128, higher = better quality but slower)
+  num_blocks: 6             # Number of transformer blocks (4-8 recommended)
+  # num_blocks: 2             # Number of transformer blocks (4-8 recommended)
 
 # Training Parameters
 training:
-  # batch_size: 4             # Reduce to 2 or 1 if GPU runs out of memory
   batch_size: 1             # Reduce to 2 or 1 if GPU runs out of memory
-  # epochs: 100               # Total training epochs
-  epochs: 2               # Total training epochs
+  # batch_size: 1             # Reduce to 2 or 1 if GPU runs out of memory
+  epochs: 100               # Total training epochs
+  # epochs: 2               # Total training epochs
   lr: 0.001                 # Learning rate (0.0001 for fine-tuning)
-  # save_freq: 10             # Save checkpoint every N epochs
-  image_size: 64
-  save_freq: 1             # Save checkpoint every N epochs
+  image_size: 128
+  save_freq: 10             # Save checkpoint every N epochs
+  # save_freq: 1             # Save checkpoint every N epochs
   
   # Dataset paths
   dataset_path: 'data/LOLv2'  # Path to LOL dataset
@@ -26,16 +26,16 @@ training:
   checkpoint_dir: 'checkpoints'
   
   # Device configuration
-  # device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU (much slower)
-  device: 'cpu'            # 'cuda' for GPU, 'cpu' for CPU (much slower)
-  # num_workers: 4            # DataLoader workers (reduce if CPU limited)
-  num_workers: 0            # DataLoader workers (reduce if CPU limited)
+  device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU (much slower)
+  # device: 'cpu'            # 'cuda' for GPU, 'cpu' for CPU (much slower)
+  num_workers: 4            # DataLoader workers (reduce if CPU limited)
+  # num_workers: 0            # DataLoader workers (reduce if CPU limited)
 
 # Inference Parameters
 inference:
   model_path: 'checkpoints/best_model.pth'  # Path to trained model
-  # device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU
-  device: 'cpu'            # 'cuda' for GPU, 'cpu' for CPU
+  device: 'cuda'            # 'cuda' for GPU, 'cpu' for CPU
+  # device: 'cpu'            # 'cuda' for GPU, 'cpu' for CPU
   output_dir: 'outputs'     # Where to save enhanced images
 
 # Loss Weights (advanced, modify carefully)

@@ -130,7 +130,7 @@ class LowLightDataset(Dataset):
             return self.__getitem__((idx + 1) % len(self))
 
 
-def get_dataloaders(dataset_path, batch_size=4, image_size=256, num_workers=4):
+def get_dataloaders(dataset_path, batch_size=1, image_size=128, num_workers=4):
     """
     Create train and test dataloaders
     
