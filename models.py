@@ -199,91 +199,200 @@ class DetailNet(nn.Module):
         return x
 
 
+# class AdaptiveIGAttention(nn.Module):
+#     """
+#     Adaptive Illumination-Guided Attention Block
+    
+#     Combines self-attention with illumination guidance and learned level embeddings
+    
+#     Args:
+#         dim: Feature dimension
+#         num_heads: Number of attention heads
+#         num_levels: Number of illumination levels to embed
+#     """
+#     def __init__(self, dim, num_heads=8, num_levels=10):
+#         super(AdaptiveIGAttention, self).__init__()
+#         self.dim = dim
+#         self.num_heads = num_heads
+#         self.head_dim = dim // num_heads
+#         assert dim % num_heads == 0, "dim must be divisible by num_heads"
+        
+#         # Q, K, V projections for self-attention
+#         self.qkv = nn.Linear(dim, dim * 3)
+#         self.proj_out = nn.Linear(dim, dim)
+        
+#         # Illumination gating mechanism
+#         self.illum_gate_conv = nn.Sequential(
+#             nn.Conv2d(1, dim, kernel_size=3, padding=1),
+#             nn.ReLU(inplace=True),
+#             nn.Conv2d(dim, dim, kernel_size=3, padding=1),
+#             nn.Sigmoid()
+#         )
+        
+#         # Learnable illumination level embeddings
+#         self.num_levels = num_levels
+#         self.level_embeddings = nn.Parameter(torch.randn(num_levels, dim))
+        
+#         # Layer norm for stability
+#         self.norm = nn.LayerNorm(dim)
+    
+#     def forward(self, x, illum_map):
+#         """
+#         Args:
+#             x: Input features [B, dim, H, W]
+#             illum_map: Illumination map [B, 1, H, W]
+        
+#         Returns:
+#             out: Attention output [B, dim, H, W]
+#         """
+#         B, C, H, W = x.shape
+        
+#         # Prepare for attention: reshape to [B, H*W, C]
+#         x_flat = x.flatten(2).transpose(1, 2)  # [B, H*W, C]
+#         x_norm = self.norm(x_flat)
+        
+#         # Compute Q, K, V
+#         qkv = self.qkv(x_norm).reshape(B, H * W, 3, self.num_heads, self.head_dim)
+#         qkv = qkv.permute(2, 0, 3, 1, 4)  # [3, B, num_heads, H*W, head_dim]
+#         q, k, v = qkv[0], qkv[1], qkv[2]
+        
+#         # Scaled dot-product attention
+#         scale = self.head_dim ** -0.5
+#         attn = (q @ k.transpose(-2, -1)) * scale  # [B, num_heads, H*W, H*W]
+#         attn = F.softmax(attn, dim=-1)
+        
+#         # Apply attention to values
+#         out = (attn @ v).transpose(1, 2).reshape(B, H * W, C)  # [B, H*W, C]
+#         out = self.proj_out(out)
+#         out = out.transpose(1, 2).reshape(B, C, H, W)  # [B, C, H, W]
+        
+#         # Illumination gating
+#         gate = self.illum_gate_conv(illum_map)  # [B, dim, H, W]
+#         out = out * gate
+        
+#         # Add illumination level embeddings
+#         # Quantize illumination to discrete levels
+#         illum_levels = (illum_map * (self.num_levels - 1)).long().clamp(0, self.num_levels - 1)  # [B, 1, H, W]
+#         illum_levels = illum_levels.squeeze(1)  # [B, H, W]
+        
+#         # Gather embeddings for each pixel
+#         level_embed = self.level_embeddings[illum_levels]  # [B, H, W, dim]
+#         level_embed = level_embed.permute(0, 3, 1, 2)  # [B, dim, H, W]
+        
+#         # Adaptive addition
+#         out = out + level_embed
+        
+#         return out
 class AdaptiveIGAttention(nn.Module):
     """
-    Adaptive Illumination-Guided Attention Block
-    
-    Combines self-attention with illumination guidance and learned level embeddings
-    
-    Args:
-        dim: Feature dimension
-        num_heads: Number of attention heads
-        num_levels: Number of illumination levels to embed
+    Window-based Illumination-Guided Attention
+    Maintains transformer architecture while being memory-efficient
     """
-    def __init__(self, dim, num_heads=8, num_levels=10):
+    def __init__(self, dim, num_heads=8, num_levels=10, window_size=8):
         super(AdaptiveIGAttention, self).__init__()
         self.dim = dim
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
-        assert dim % num_heads == 0, "dim must be divisible by num_heads"
+        self.window_size = window_size  # Process 8×8 windows
         
-        # Q, K, V projections for self-attention
+        assert dim % num_heads == 0
+        
+        # Q, K, V projections (still transformer!)
         self.qkv = nn.Linear(dim, dim * 3)
         self.proj_out = nn.Linear(dim, dim)
         
-        # Illumination gating mechanism
+        # Illumination gating
         self.illum_gate_conv = nn.Sequential(
-            nn.Conv2d(1, dim, kernel_size=3, padding=1),
+            nn.Conv2d(1, dim, 3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(dim, dim, kernel_size=3, padding=1),
+            nn.Conv2d(dim, dim, 3, padding=1),
             nn.Sigmoid()
         )
         
-        # Learnable illumination level embeddings
+        # Level embeddings
         self.num_levels = num_levels
         self.level_embeddings = nn.Parameter(torch.randn(num_levels, dim))
         
-        # Layer norm for stability
         self.norm = nn.LayerNorm(dim)
     
-    def forward(self, x, illum_map):
-        """
-        Args:
-            x: Input features [B, dim, H, W]
-            illum_map: Illumination map [B, 1, H, W]
+    def window_partition(self, x):
+        """Partition into non-overlapping windows"""
+        B, C, H, W = x.shape
+        ws = self.window_size
         
-        Returns:
-            out: Attention output [B, dim, H, W]
-        """
+        # Pad if needed
+        pad_h = (ws - H % ws) % ws
+        pad_w = (ws - W % ws) % ws
+        if pad_h > 0 or pad_w > 0:
+            x = F.pad(x, (0, pad_w, 0, pad_h))
+        
+        H_pad, W_pad = H + pad_h, W + pad_w
+        num_h = H_pad // ws
+        num_w = W_pad // ws
+        
+        # Reshape into windows
+        x = x.view(B, C, num_h, ws, num_w, ws)
+        x = x.permute(0, 2, 4, 3, 5, 1).contiguous()  # [B, num_h, num_w, ws, ws, C]
+        x = x.view(B * num_h * num_w, ws * ws, C)  # [B*num_windows, ws*ws, C]
+        
+        return x, (H, W, H_pad, W_pad, num_h, num_w)
+    
+    def window_reverse(self, windows, window_info):
+        """Reverse window partition"""
+        H, W, H_pad, W_pad, num_h, num_w = window_info
+        B = windows.shape[0] // (num_h * num_w)
+        ws = self.window_size
+        C = windows.shape[-1]
+        
+        x = windows.view(B, num_h, num_w, ws, ws, C)
+        x = x.permute(0, 5, 1, 3, 2, 4).contiguous()  # [B, C, num_h, ws, num_w, ws]
+        x = x.view(B, C, H_pad, W_pad)
+        
+        # Remove padding
+        if H_pad > H or W_pad > W:
+            x = x[:, :, :H, :W]
+        
+        return x
+    
+    def forward(self, x, illum_map):
         B, C, H, W = x.shape
         
-        # Prepare for attention: reshape to [B, H*W, C]
-        x_flat = x.flatten(2).transpose(1, 2)  # [B, H*W, C]
-        x_norm = self.norm(x_flat)
+        # Partition into windows
+        x_windows, window_info = self.window_partition(x)  # [B*num_windows, ws*ws, C]
         
-        # Compute Q, K, V
-        qkv = self.qkv(x_norm).reshape(B, H * W, 3, self.num_heads, self.head_dim)
-        qkv = qkv.permute(2, 0, 3, 1, 4)  # [3, B, num_heads, H*W, head_dim]
+        # Apply attention within each window (SMALL matrices now!)
+        x_norm = self.norm(x_windows)
+        
+        # QKV projection
+        qkv = self.qkv(x_norm).reshape(-1, self.window_size * self.window_size, 
+                                         3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)  # [3, B*num_win, heads, ws*ws, head_dim]
         q, k, v = qkv[0], qkv[1], qkv[2]
         
-        # Scaled dot-product attention
+        # Scaled dot-product attention (only 8×8=64 tokens per window!)
         scale = self.head_dim ** -0.5
-        attn = (q @ k.transpose(-2, -1)) * scale  # [B, num_heads, H*W, H*W]
+        attn = (q @ k.transpose(-2, -1)) * scale  # [B*num_win, heads, 64, 64] - TINY!
         attn = F.softmax(attn, dim=-1)
         
-        # Apply attention to values
-        out = (attn @ v).transpose(1, 2).reshape(B, H * W, C)  # [B, H*W, C]
+        # Apply attention
+        out = (attn @ v).transpose(1, 2).reshape(-1, self.window_size * self.window_size, C)
         out = self.proj_out(out)
-        out = out.transpose(1, 2).reshape(B, C, H, W)  # [B, C, H, W]
+        
+        # Reverse windows back to feature map
+        out = self.window_reverse(out, window_info)  # [B, C, H, W]
         
         # Illumination gating
-        gate = self.illum_gate_conv(illum_map)  # [B, dim, H, W]
+        gate = self.illum_gate_conv(illum_map)
         out = out * gate
         
-        # Add illumination level embeddings
-        # Quantize illumination to discrete levels
-        illum_levels = (illum_map * (self.num_levels - 1)).long().clamp(0, self.num_levels - 1)  # [B, 1, H, W]
-        illum_levels = illum_levels.squeeze(1)  # [B, H, W]
+        # Level embeddings
+        illum_levels = (illum_map * (self.num_levels - 1)).long().clamp(0, self.num_levels - 1)
+        illum_levels = illum_levels.squeeze(1)
+        level_embed = self.level_embeddings[illum_levels]
+        level_embed = level_embed.permute(0, 3, 1, 2)
         
-        # Gather embeddings for each pixel
-        level_embed = self.level_embeddings[illum_levels]  # [B, H, W, dim]
-        level_embed = level_embed.permute(0, 3, 1, 2)  # [B, dim, H, W]
-        
-        # Adaptive addition
         out = out + level_embed
-        
         return out
-
 
 class FrequencyAdaptiveFusion(nn.Module):
     """
